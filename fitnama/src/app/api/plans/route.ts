@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     const { name, goal, level, dayCount, isTemplate, days } = parsed.data
 
-    const plan = await prisma.$transaction(async (tx) => {
+    const plan = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       return tx.workoutPlan.create({
         data: {
           ownerId: session.userId,

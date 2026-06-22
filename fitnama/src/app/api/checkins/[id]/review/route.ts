@@ -34,7 +34,7 @@ export async function POST(
 
     const { followUp } = parsed.data
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       // Mark check-in reviewed
       const reviewed = await tx.checkIn.update({
         where: { id: checkInId },

@@ -77,7 +77,7 @@ export async function POST(
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const { message, unreadUpdate } = await prisma.$transaction(async (tx) => {
+    const { message, unreadUpdate } = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       const message = await tx.message.create({
         data: {
           conversationId: id,

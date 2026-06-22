@@ -76,7 +76,7 @@ export async function POST(
     const snapshot = workoutSession.daySnapshot as Record<string, unknown>
     const newPRs = derivePRs(workoutSession.logs, snapshot)
 
-    const { finished, prs } = await prisma.$transaction(async (tx) => {
+    const { finished, prs } = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       const finished = await tx.workoutSession.update({
         where: { id },
         data: {

@@ -114,7 +114,7 @@ export async function PUT(
 
     const { name, focus, order, sections } = parsed.data
 
-    const day = await prisma.$transaction(async (tx) => {
+    const day = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       // Delete all existing sections (cascades to blocks → exercises)
       await tx.workoutSection.deleteMany({ where: { dayId } })
 

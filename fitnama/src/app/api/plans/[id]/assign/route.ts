@@ -62,7 +62,7 @@ export async function POST(
     // Freeze the day as a JSON snapshot — plan edits will never rewrite this
     const daySnapshot = JSON.parse(JSON.stringify(day))
 
-    const { assignment, session: workoutSession } = await prisma.$transaction(async (tx) => {
+    const { assignment, session: workoutSession } = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       const assignment = await tx.assignment.create({
         data: { planId, athleteId, coachId: session.userId },
       })

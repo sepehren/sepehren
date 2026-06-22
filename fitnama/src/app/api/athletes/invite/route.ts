@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the CoachAthlete link + Conversation in one transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       const link = await tx.coachAthlete.create({
         data: {
           coachId: session.userId,
