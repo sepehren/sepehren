@@ -1,0 +1,424 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  COACH
+  ATHLETE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  name         String
+  avatarHue    Int      @default(100)
+  locale       String   @default("en")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  coachLinks   CoachAthlete[] @relation("CoachSide")
+  athleteLinks CoachAthlete[] @relation("AthleteSide")
+
+  ownedPlans          WorkoutPlan[]    @relation("PlanOwner")
+  ownedNutritionPlans NutritionPlan[]  @relation("NutritionOwner")
+  ownedExercises      ExerciseLibrary[] @relation("ExerciseOwner")
+
+  sessions      WorkoutSession[]
+  foodLogs      FoodLog[]
+  checkIns      CheckIn[]
+  checkInScheds CheckInSchedule[]
+  progress      ProgressEntry[]
+  authoredMsgs  Message[]         @relation("MsgAuthor")
+  programReqs   ProgramRequest[]  @relation("RequestAthlete")
+
+  sessions_reset PasswordReset[]
+}
+
+model CoachAthlete {
+  id        String   @id @default(cuid())
+  coach     User     @relation("CoachSide", fields: [coachId], references: [id], onDelete: Cascade)
+  coachId   String
+  athlete   User     @relation("AthleteSide", fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId String
+  status    String   @default("active")
+  goal      String?
+  invitedAt DateTime @default(now())
+  joinedAt  DateTime?
+
+  conversation Conversation?
+
+  @@unique([coachId, athleteId])
+  @@index([coachId])
+  @@index([athleteId])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model ExerciseLibrary {
+  id         String   @id @default(cuid())
+  name       String
+  primary    String?
+  equipment  String?
+  difficulty String?
+  category   String?
+  cues       String[]
+  mediaUrl   String?
+  owner      User?    @relation("ExerciseOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId    String?
+  createdAt  DateTime @default(now())
+
+  blockExercises BlockExercise[]
+
+  @@index([ownerId])
+  @@index([name])
+}
+
+enum PlanStatus {
+  DRAFT
+  ASSIGNED
+  ARCHIVED
+}
+
+model WorkoutPlan {
+  id        String     @id @default(cuid())
+  owner     User       @relation("PlanOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String
+  name      String
+  goal      String?
+  level     String?
+  dayCount  Int        @default(3)
+  status    PlanStatus @default(DRAFT)
+  isTemplate Boolean   @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  days        WorkoutDay[]
+  assignments Assignment[]
+
+  @@index([ownerId])
+}
+
+model WorkoutDay {
+  id      String  @id @default(cuid())
+  plan    WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId  String
+  name    String
+  focus   String?
+  order   Int     @default(0)
+
+  sections WorkoutSection[]
+
+  @@index([planId])
+}
+
+model WorkoutSection {
+  id     String  @id @default(cuid())
+  day    WorkoutDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  dayId  String
+  label  String
+  order  Int     @default(0)
+
+  blocks WorkoutBlock[]
+
+  @@index([dayId])
+}
+
+enum BlockFormat {
+  WARMUP
+  STRENGTH
+  SUPERSET
+  AMRAP
+  FORTIME
+  EMOM
+  ROUNDS
+}
+
+model WorkoutBlock {
+  id        String      @id @default(cuid())
+  section   WorkoutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId String
+  format    BlockFormat
+  title     String?
+  order     Int         @default(0)
+
+  minutes   Int?
+  interval  Int?
+  rounds    Int?
+  sets      Int?
+  scheme    String?
+  rest      String?
+  cap       String?
+  note      String?
+
+  exercises BlockExercise[]
+
+  @@index([sectionId])
+}
+
+model BlockExercise {
+  id        String  @id @default(cuid())
+  block     WorkoutBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId   String
+  name      String
+  library   ExerciseLibrary? @relation(fields: [libraryId], references: [id])
+  libraryId String?
+  order     Int     @default(0)
+
+  reps      Int?
+  sets      Int?
+  load      Float?
+  loadUnit  String? @default("kg")
+  rpe       Float?
+  distance  String?
+  calories  Int?
+  duration  String?
+  tempo     String?
+  note      String?
+
+  logs      ExerciseLog[]
+
+  @@index([blockId])
+}
+
+model Assignment {
+  id        String   @id @default(cuid())
+  plan      WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId    String
+  athleteId String
+  coachId   String
+  startDate DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  sessions  WorkoutSession[]
+
+  @@index([athleteId])
+  @@index([planId])
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model WorkoutSession {
+  id           String        @id @default(cuid())
+  assignment   Assignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assignmentId String?
+  athlete      User          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId    String
+  planName     String
+  dayName      String
+  daySnapshot  Json
+  status       SessionStatus @default(SCHEDULED)
+  scheduledFor DateTime      @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  rating        Int?
+  painFlag      Boolean  @default(false)
+  painLocation  String?
+  feedbackNote  String?
+
+  logs ExerciseLog[]
+  prs  PersonalRecord[]
+
+  @@index([athleteId, status])
+}
+
+model ExerciseLog {
+  id              String   @id @default(cuid())
+  session         WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId       String
+  blockExercise   BlockExercise? @relation(fields: [blockExerciseId], references: [id], onDelete: SetNull)
+  blockExerciseId String?
+  done            Boolean  @default(false)
+  loggedLoad      Float?
+  loggedReps      Int?
+  blockResult     String?
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model PersonalRecord {
+  id        String   @id @default(cuid())
+  session   WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  athleteId String
+  name      String
+  value     String
+  achievedAt DateTime @default(now())
+
+  @@index([athleteId])
+}
+
+model NutritionPlan {
+  id         String     @id @default(cuid())
+  owner      User       @relation("NutritionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId    String
+  athleteId  String?
+  name       String
+  calories   Int
+  protein    Int
+  carbs      Int
+  fat        Int
+  water      Float?
+  allowed    String[]
+  restricted String[]
+  notes      String?
+  status     PlanStatus @default(DRAFT)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  meals Meal[]
+
+  @@index([ownerId])
+  @@index([athleteId])
+}
+
+model Meal {
+  id       String @id @default(cuid())
+  plan     NutritionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId   String
+  name     String
+  guidance String?
+  kcal     Int    @default(0)
+  order    Int    @default(0)
+
+  @@index([planId])
+}
+
+model FoodLog {
+  id        String   @id @default(cuid())
+  athlete   User     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId String
+  loggedFor DateTime @default(now())
+  food      String
+  kcal      Int
+  protein   Int      @default(0)
+  carbs     Int      @default(0)
+  fat       Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([athleteId, loggedFor])
+}
+
+model CheckInSchedule {
+  id         String   @id @default(cuid())
+  athlete    User     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId  String
+  coachId    String
+  cadence    String   @default("weekly")
+  weekday    Int      @default(1)
+  active     Boolean  @default(true)
+  nextDueAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([athleteId])
+}
+
+model CheckIn {
+  id         String   @id @default(cuid())
+  athlete    User     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId  String
+  energy     Int
+  soreness   Int
+  stress     Int
+  sleep      Int
+  confidence Int
+  nutrition  String?
+  blockers   String?
+  note       String?
+  reviewed   Boolean  @default(false)
+  followUp   String?
+  submittedAt DateTime @default(now())
+  reviewedAt  DateTime?
+
+  @@index([athleteId, reviewed])
+}
+
+model Conversation {
+  id             String   @id @default(cuid())
+  link           CoachAthlete @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  linkId         String   @unique
+  unreadForCoach   Int    @default(0)
+  unreadForAthlete Int    @default(0)
+  updatedAt      DateTime @updatedAt
+
+  messages Message[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  author         User     @relation("MsgAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId       String
+  fromRole       Role
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+enum RequestType {
+  PLAN_CHANGE
+  NEW_PLAN
+  DELOAD
+  PAUSE
+  OTHER
+}
+
+enum RequestStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DECLINED
+}
+
+model ProgramRequest {
+  id         String        @id @default(cuid())
+  athlete    User          @relation("RequestAthlete", fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId  String
+  coachId    String
+  type       RequestType
+  reason     String
+  status     RequestStatus @default(OPEN)
+  resolution String?
+  createdAt  DateTime      @default(now())
+  resolvedAt DateTime?
+
+  @@index([coachId, status])
+  @@index([athleteId])
+}
+
+model ProgressEntry {
+  id        String   @id @default(cuid())
+  athlete   User     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athleteId String
+  recordedAt DateTime @default(now())
+  weightKg  Float?
+  measurements Json?
+  note      String?
+  photoUrls String[]
+
+  @@index([athleteId, recordedAt])
+}
