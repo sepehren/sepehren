@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 // Vercel Cron: runs daily to advance CheckInSchedule.nextDueAt.
 // Configure in vercel.json: { "crons": [{ "path": "/api/cron/checkins", "schedule": "0 6 * * *" }] }
 
